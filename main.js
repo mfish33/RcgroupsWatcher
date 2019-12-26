@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 let URL = 'https://www.rcgroups.com/aircraft-electric-multirotor-fs-w-733/';
 const app = express();
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }))
 const port = 3000;
 
 let usedIDs = new Set();
