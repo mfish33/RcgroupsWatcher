@@ -11,7 +11,7 @@ let parser = new DomParser();
 
 
 let URL = 'https://www.rcgroups.com/aircraft-electric-multirotor-fs-w-733/';
-let botToken = 'xoxb-303686001104-876051583745-fNmxAtilYZwFF5AfcRqoQTEA';
+let botToken = 'xoxb-303686001104-876051583745-YQHolsrBIOoUrDuNIwQi5A9X';
 
 const app = express();
 app.use(bodyParser.json());
@@ -25,7 +25,6 @@ app.post('/handleSlack', async (req, res) => {
         let {text,user} = event
         let [,command,...keyWords] = text.split(' ')
         keyWords = keyWords.join(' ').split(',').map(keyword => keyword.toLowerCase())
-        console.log(keyWords)
 
         if(command == 'add') {
             for(let keyWord of keyWords) {
@@ -37,6 +36,7 @@ app.post('/handleSlack', async (req, res) => {
                     storage.setItem(keyWord,[user])
                 }
             }
+
         } else if(command == 'remove') {
             for(let keyWord of keyWords) {
                 let watchers = await storage.getItem(keyWord)
@@ -58,7 +58,7 @@ app.get('/', (req, res) => {
 	res.send('hello');
 });
 
-app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+app.listen(port, () => console.log(`app started on port: ${port}!`));
 
 async function updateStore() {
 	let data = RCGparser(await fetch(URL).then((res) => res.text()));
@@ -99,7 +99,7 @@ const sendMessage = (user,text) => {
         text:text
     };
  
-    let data = fetch('https://slack.com/api/chat.postMessage', {
+    fetch('https://slack.com/api/chat.postMessage', {
             method: 'post',
             body:    JSON.stringify(body),
             headers: { 
