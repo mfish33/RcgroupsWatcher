@@ -11,7 +11,11 @@ const port = 3000
 let usedIDs = new Set()
 
 app.post('/handleSlack', (req, res) => {
-    req.body()
+    console.log(req.body())
+    res.send('hello')
+})
+
+app.get('/', (req, res) => {
     res.send('hello')
 })
 
