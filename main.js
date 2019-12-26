@@ -3,7 +3,6 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const storage = require('node-persist');
 const DomParser = require('dom-parser');
-const circularArray = require('./circularArray.js')
 let parser = new DomParser();
 
 //storage setup
@@ -11,13 +10,14 @@ let parser = new DomParser();
 
 
 let URL = 'https://www.rcgroups.com/aircraft-electric-multirotor-fs-w-733/';
-let botToken = 'xoxb-303686001104-876051583745-YQHolsrBIOoUrDuNIwQi5A9X';
+let botToken = 'Token';
 
 const app = express();
 app.use(bodyParser.json());
 const port = 8080;
 
-let usedIDs = new circularArray(30);
+let usedIDs = []
+let idHistorySize = 30;
 
 app.post('/handleSlack', async (req, res) => {
     try{
@@ -65,8 +65,14 @@ async function updateStore() {
     console.log('data recieved');
     let search = await storage.keys()
 	for (let item of data) {
-		if (!usedIDs.arr.includes(item.id)) {
-            usedIDs.write(item.id); 
+		if (!usedIDs.includes(item.id)) {
+            usedIDs.push(item.id); 
+
+            //make sure ID list does not get too big
+            if(usedIDs.length > idHistorySize) {
+                usedIDs.shift()
+            }
+
             for(let term of search) {
                 let searchRegex = new RegExp(term)
                 if(item.title.match(searchRegex) || item.details.match(searchRegex)) {
@@ -77,7 +83,8 @@ async function updateStore() {
                 }
             }
 		}
-	}
+    }
+    console.log(usedIDs.arr)
 }
 
 const RCGparser = (rawHTML) => {
