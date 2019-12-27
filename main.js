@@ -3,6 +3,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const storage = require('node-persist');
 const DomParser = require('dom-parser');
+const circularArray = require('./circularArray.js')
 let parser = new DomParser();
 
 //storage setup
@@ -10,16 +11,17 @@ let parser = new DomParser();
 
 
 let URL = 'https://www.rcgroups.com/aircraft-electric-multirotor-fs-w-733/';
-let botToken = 'Token';
+let botToken = 'key';
+let usedIDs = new circularArray(60)
+
 
 const app = express();
 app.use(bodyParser.json());
 const port = 8080;
 
-let usedIDs = []
-let idHistorySize = 30;
 
 app.post('/handleSlack', async (req, res) => {
+    res.sendStatus(200);
     try{
         let {event} = req.body
         let {text,user} = event
@@ -44,6 +46,19 @@ app.post('/handleSlack', async (req, res) => {
                     storage.setItem(keyWord,watchers.filter(watcher => watcher!=user))
                 }
             }
+        } else if(command == 'keywords') {
+            let allKeywords = (await storage.keys())
+            .map(async(keyword) => {
+                let users = await storage.getItem(keyword)
+                return {
+                    keyWord:keyword,
+                    users: users
+                }
+            })
+            let formatedOutput = (await Promise.all(allKeywords)).filter(tuple => tuple.users.includes(user)).reduce((acc,tuple) => `${acc},${tuple.keyWord}`,'').substr(1)
+            console.log(`you are subscribed to the following keywords: ${formatedOutput}`)
+            sendMessage(user,`you are subscribed to the following keywords: ${formatedOutput}`)
+
         } else {
             sendMessage(user,'The RCG bot did not understand your request')
         }
@@ -51,7 +66,6 @@ app.post('/handleSlack', async (req, res) => {
     } catch (e) {
         console.log(e)
     }
-	res.sendStatus(200);
 });
 
 app.get('/', (req, res) => {
@@ -65,26 +79,24 @@ async function updateStore() {
     console.log('data recieved');
     let search = await storage.keys()
 	for (let item of data) {
-		if (!usedIDs.includes(item.id)) {
-            usedIDs.push(item.id); 
-
-            //make sure ID list does not get too big
-            if(usedIDs.length > idHistorySize) {
-                usedIDs.shift()
-            }
-
+		if (!usedIDs.arr.includes(item.id)) {
+            usedIDs.write(item.id); 
             for(let term of search) {
                 let searchRegex = new RegExp(term)
                 if(item.title.match(searchRegex) || item.details.match(searchRegex)) {
                     let users = await storage.getItem(term)
                     for(let user of users) {
-                        sendMessage(user,`your watch for ${term} triggered when ${item.title} was been posted to RCG ${item.url}`)
+                        console.log('message sent')
+                        //sendMessage(user,`your watch for ${term} triggered when ${item.title} was been posted to RCG ${item.url}`)
                     }
                 }
             }
 		}
     }
-    console.log(usedIDs.arr)
+}
+
+const getPosts = async() => {
+    
 }
 
 const RCGparser = (rawHTML) => {
@@ -117,4 +129,4 @@ const sendMessage = (user,text) => {
 }
 
 updateStore();
-setInterval(updateStore,60000)
+setInterval(updateStore,5000)
