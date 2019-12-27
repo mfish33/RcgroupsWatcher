@@ -11,7 +11,7 @@ let parser = new DomParser();
 
 
 let URL = 'https://www.rcgroups.com/aircraft-electric-multirotor-fs-w-733/';
-let botToken = 'key';
+let botToken = 'token';
 let usedIDs = new circularArray(60)
 
 
@@ -56,7 +56,6 @@ app.post('/handleSlack', async (req, res) => {
                 }
             })
             let formatedOutput = (await Promise.all(allKeywords)).filter(tuple => tuple.users.includes(user)).reduce((acc,tuple) => `${acc},${tuple.keyWord}`,'').substr(1)
-            console.log(`you are subscribed to the following keywords: ${formatedOutput}`)
             sendMessage(user,`you are subscribed to the following keywords: ${formatedOutput}`)
 
         } else {
@@ -86,8 +85,7 @@ async function updateStore() {
                 if(item.title.match(searchRegex) || item.details.match(searchRegex)) {
                     let users = await storage.getItem(term)
                     for(let user of users) {
-                        console.log('message sent')
-                        //sendMessage(user,`your watch for ${term} triggered when ${item.title} was been posted to RCG ${item.url}`)
+                        sendMessage(user,`your watch for ${term} triggered when ${item.title} was been posted to RCG ${item.url}`)
                     }
                 }
             }
