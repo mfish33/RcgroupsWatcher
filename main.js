@@ -1,4 +1,4 @@
-require('dotenv').config()
+require('dotenv').config();
 const fetch = require('node-fetch');
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -13,15 +13,13 @@ const port = 8080;
 
 //init
 (async () => {
-    await storage.init();
-    app.listen(port, () => console.log(`app started on port: ${port}!`));
+	await storage.init();
+	app.listen(port, () => console.log(`app started on port: ${port}!`));
 })();
 
 let URL = 'https://www.rcgroups.com/aircraft-electric-multirotor-fs-w-733/';
 let botToken = process.env.BOT_KEY;
 let usedIDs = new circularArray(60);
-
-
 
 app.post('/handleSlack', async (req, res) => {
 	res.sendStatus(200);
@@ -62,13 +60,12 @@ app.post('/handleSlack', async (req, res) => {
 				.substr(1);
 			sendMessage(channel, `you are subscribed to the following keywords: ${formatedOutput}`);
 		} else {
-			sendMessage(user, 'The RCG bot did not understand your request');
+			sendMessage(channel, 'The RCG bot did not understand your request');
 		}
 	} catch (e) {
 		console.log(e);
 	}
 });
-
 
 async function updateStore() {
 	try {
@@ -123,7 +120,5 @@ const sendMessage = (userOrChannel, text) => {
 		}
 	});
 };
-
-
 
 setInterval(updateStore, 60000);
