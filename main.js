@@ -1,64 +1,81 @@
-require('dotenv').config();
+//modules imports
 const fetch = require('node-fetch');
 const express = require('express');
 const bodyParser = require('body-parser');
 const storage = require('node-persist');
 const DomParser = require('dom-parser');
-const circularArray = require('./circularArray.js');
 let parser = new DomParser();
 
+//import custom array class to lower storage and memory as time goes on
+const circularArray = require('./circularArray.js');
+
+//get bot token from .env file
+require('dotenv').config();
+
+// express app setup
 const app = express();
 app.use(bodyParser.json());
 const port = 8080;
 
+//Set to desired rc groups classified link
+let URL = 'https://www.rcgroups.com/aircraft-electric-multirotor-fs-w-733/';
+
+let usedIDs = []; //set global scope for varible to use inside iffie init func
 //init
 (async () => {
 	await storage.init();
+	usedIDs = new circularArray(60, storage, await storage.getItem('ids'));
 	app.listen(port, () => console.log(`app started on port: ${port}!`));
 })();
 
-let URL = 'https://www.rcgroups.com/aircraft-electric-multirotor-fs-w-733/';
-let botToken = process.env.BOT_KEY;
-let usedIDs = new circularArray(60);
-
+//slack bot endpoint
 app.post('/handleSlack', async (req, res) => {
-	res.sendStatus(200);
+	res.sendStatus(200); //send res imeadiatly becasue the bot will respond through sending messages into slack
 	try {
-		let { event } = req.body;
-		let { text, user, channel } = event;
-		let [ , command, ...keyWords ] = text.split(' ');
-		keyWords = keyWords.join(' ').split(',').map((keyword) => keyword.toLowerCase());
+		//prevent app crash if somthing goes wrong at runtime
+		let { text, user, channel } = req.body.event;
+		let [ , command, ...keywords ] = text.split(' ');
+		keywords = keywords.join(' ').split(',').map((keyword) => keyword.toLowerCase());
+		let storedKeywords = await storage.getItem('keywords');
 
 		if (command == 'add') {
-			for (let keyWord of keyWords) {
-				let watchers = await storage.getItem(keyWord);
-				if (watchers) {
-					watchers.includes(user) ? null : watchers.push(user);
-					storage.setItem(keyWord, watchers);
+			if (!storedKeywords) {
+				storedKeywords = [];
+			}
+			for (let keyword of keywords) {
+				let storedKeyword = storedKeywords.filter((i) => i.keyword == keyword)[0];
+				if (storedKeyword) {
+					let updatedKeywords = storedKeywords.map((i) => {
+						if (i.keyword == keyword && !i.users.includes(user)) {
+							i.users.push(user);
+						}
+						return i;
+					});
+					storage.setItem('keywords', updatedKeywords);
 				} else {
-					storage.setItem(keyWord, [ user ]);
+					storedKeywords.push({
+						keyword: keyword,
+						users: [ user ]
+					});
+					storage.setItem('keywords', storedKeywords);
 				}
 			}
 		} else if (command == 'remove') {
-			for (let keyWord of keyWords) {
-				let watchers = await storage.getItem(keyWord);
-				if (watchers) {
-					storage.setItem(keyWord, watchers.filter((watcher) => watcher != user));
+			let updatedKeywords = storedKeywords.map((i) => {
+				if (keywords.includes(i.keyword)) {
+					i.users = i.users.filter((j) => j != user);
 				}
-			}
-		} else if (command == 'keywords') {
-			let allKeywords = (await storage.keys()).map(async (keyword) => {
-				let users = await storage.getItem(keyword);
-				return {
-					keyWord: keyword,
-					users: users
-				};
+				return i;
 			});
-			let formatedOutput = (await Promise.all(allKeywords))
-				.filter((tuple) => tuple.users.includes(user))
-				.reduce((acc, tuple) => `${acc},${tuple.keyWord}`, '')
-				.substr(1);
-			sendMessage(channel, `you are subscribed to the following keywords: ${formatedOutput}`);
+			storage.setItem('keywords', updatedKeywords);
+		} else if (command == 'keywords') {
+			let subscribedKeywords = storedKeywords.filter((i) => i.users.includes(user));
+			let formatedOutput = subscribedKeywords.reduce((acc, i) => `${acc},${i.keyword}`, '').substr(1);
+			if (formatedOutput) {
+				sendMessage(channel, `you are subscribed to the following keywords: ${formatedOutput}`);
+			} else {
+				sendMessage(channel, 'You are not subscribed to any keywords');
+			}
 		} else {
 			sendMessage(channel, 'The RCG bot did not understand your request');
 		}
@@ -67,22 +84,22 @@ app.post('/handleSlack', async (req, res) => {
 	}
 });
 
-async function updateStore() {
-	try {
+/**
+*retrieves data from rcgroups and sends apropriate messages 
+*/
+const updateStore = async () => {
+	try { //stops app from crashing if there is an error with the fetch
 		let data = RCGparser(await fetch(URL).then((res) => res.text()));
-		let search = await storage.keys();
+		let storedKeywords = await storage.getItem('keywords');
 		for (let item of data) {
 			if (!usedIDs.arr.includes(item.id)) {
 				usedIDs.write(item.id);
-				for (let term of search) {
-					let searchRegex = new RegExp(term);
+				for (let keyword of storedKeywords) {
+					let searchRegex = new RegExp(keyword.keyword);
 					if (item.title.match(searchRegex) || item.details.match(searchRegex)) {
-						let users = await storage.getItem(term);
-						for (let user of users) {
-							sendMessage(
-								user,
-								`your watch for ${term} triggered when ${item.title} was been posted to RCG ${item.url}`
-							);
+						for (let user of keyword.users) {
+							console.log('here')
+							//sendMessage(user,`your watch for ${keyword.keyword} triggered when ${item.title} was been posted to RCG ${item.url}`);
 						}
 					}
 				}
@@ -91,8 +108,12 @@ async function updateStore() {
 	} catch (e) {
 		console.log(e);
 	}
-}
+};
 
+/**
+*parses data retrieved from rcgroups fetch and returns it as an array of objects
+*@param {string} rawHTML HTML file as a string
+*/
 const RCGparser = (rawHTML) => {
 	var dom = parser.parseFromString(rawHTML);
 	return dom.getElementsByClassName('fsw-title').map((el) => {
@@ -105,6 +126,11 @@ const RCGparser = (rawHTML) => {
 	});
 };
 
+/**
+*sends message to slack workspace asynchronously
+*@param {string} userOrChannel desied user of channel of message
+*@param {string} text message to show up in slack
+*/
 const sendMessage = (userOrChannel, text) => {
 	const body = {
 		channel: userOrChannel,
@@ -116,9 +142,10 @@ const sendMessage = (userOrChannel, text) => {
 		body: JSON.stringify(body),
 		headers: {
 			'Content-Type': 'application/json',
-			Authorization: `Bearer ${botToken}`
+			Authorization: `Bearer ${process.env.BOT_KEY}`
 		}
 	});
 };
 
+// start retrieving data
 setInterval(updateStore, 60000);
