@@ -98,8 +98,7 @@ const updateStore = async () => {
 					let searchRegex = new RegExp(keyword.keyword);
 					if (item.title.match(searchRegex) || item.details.match(searchRegex)) {
 						for (let user of keyword.users) {
-							console.log('here')
-							//sendMessage(user,`your watch for ${keyword.keyword} triggered when ${item.title} was been posted to RCG ${item.url}`);
+							sendMessage(user,`your watch for ${keyword.keyword} triggered when ${item.title} was been posted to RCG ${item.url}`);
 						}
 					}
 				}
