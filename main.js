@@ -24,7 +24,7 @@ let usedIDs = []; //set global scope for varible to use inside iffie init func
 //init
 (async () => {
 	await storage.init();
-	usedIDs = new circularArray(60, storage, await storage.getItem('ids'));
+	usedIDs = new circularArray(100, storage, await storage.getItem('ids'));
 	app.listen(port, () => console.log(`app started on port: ${port}!`));
 })();
 
